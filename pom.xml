@@ -52,6 +52,7 @@
         <module>realtime</module>
         <module>server</module>
         <module>services</module>
+        <module>aggregations</module>
     </modules>
 
     <dependencyManagement>
