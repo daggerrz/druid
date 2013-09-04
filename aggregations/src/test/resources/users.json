@@ -1,0 +1,6 @@
+{"utcdt": "2010-01-01T01:01:01", "ssn": "a", "gender": "male", "age": 100, "income": 20}
+{"utcdt": "2010-01-01T01:01:01", "ssn": "aa", "gender": "male", "age": 100, "income": 20}
+{"utcdt": "2010-01-01T01:01:02", "ssn": "b", "gender": "female", "age": 50, "income": 150}
+{"utcdt": "2010-01-01T01:01:03", "ssn": "c", "gender": "male", "age": 20, "income": 20}
+{"utcdt": "2010-01-01T01:01:04", "ssn": "d", "gender": "female", "age": 30, "income": 200}
+{"utcdt": "2010-01-01T01:01:05", "ssn": "e", "gender": "male", "age": 40, "income": 50}

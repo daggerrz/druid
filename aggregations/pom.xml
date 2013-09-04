@@ -28,7 +28,7 @@
     <parent>
         <groupId>com.metamx</groupId>
         <artifactId>druid</artifactId>
-        <version>0.5.23-SNAPSHOT</version>
+        <version>0.5.51-SNAPSHOT</version>
     </parent>
 
     <properties>
@@ -59,13 +59,13 @@
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>druid-common</artifactId>
+            <artifactId>druid-indexing-common</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>druid-indexing-common</artifactId>
-            <version>${project.version}</version>
+            <groupId>org.joda</groupId>
+            <artifactId>joda-convert</artifactId>
+            <version>1.4</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
