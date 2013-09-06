@@ -36,5 +36,7 @@ class ObjectCodec[T](codec: BufferCodec[T])(implicit ordering: Ordering[T], m: M
 class MetricExtractor[T](implicit m: Manifest[T]) extends ComplexMetricExtractor {
   def extractedClass(): Class[_] = m.erasure.asInstanceOf[Class[T]]
 
-  def extractValue(inputRow: com.metamx.druid.input.InputRow, metricName: String): AnyRef = null
+  def extractValue(inputRow: com.metamx.druid.input.InputRow, metricName: String): AnyRef = {
+    throw new RuntimeException(inputRow.toString)
+  }
 }

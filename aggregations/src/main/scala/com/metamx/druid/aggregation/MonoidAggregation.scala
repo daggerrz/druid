@@ -19,7 +19,7 @@ class MonoidAggregatorFactory[T](name: String,
 
   def getComparator = Comparator
 
-  def factorize(metricFactory: ColumnSelectorFactory): Aggregator = throw new UnsupportedOperationException(this + " does not old aggregator interface")
+  def factorize(metricFactory: ColumnSelectorFactory): Aggregator = new MonoidAggeator[T](name, metricFactory.makeFloatMetricSelector(fieldName), m)
 
   def factorizeBuffered(metricFactory: ColumnSelectorFactory): BufferAggregator =
     new MonoidBufferAggregator(metricFactory.makeFloatMetricSelector(fieldName), m)
@@ -51,6 +51,28 @@ class MonoidAggregatorFactory[T](name: String,
 
 }
 
+class MonoidAggeator[T](final val name: String, selector: FloatMetricSelector, m: Monoid[T])(implicit val codec: BufferCodec[T] with FloatRepresentation[T]) extends Aggregator {
+  private[this] var value = m.identity
+
+  def aggregate() {
+    value = m.apply(value, codec.fromFloat(selector.get()))
+  }
+
+  def reset() {
+    value = m.identity
+  }
+
+  def get(): AnyRef = value.asInstanceOf[AnyRef]
+
+  def getFloat: Float = codec.toFloat(value)
+
+  def getName: String = name
+
+  override def clone = new MonoidAggeator[T](name, selector, m)
+
+  def close() {}
+}
+
 class MonoidBufferAggregator[T](selector: FloatMetricSelector, m: Monoid[T])(implicit val codec: BufferCodec[T] with FloatRepresentation[T]) extends BufferAggregator {
   def init(buf: ByteBuffer, position: Int) {
     codec.write(buf, position, m.identity)
@@ -58,8 +80,11 @@ class MonoidBufferAggregator[T](selector: FloatMetricSelector, m: Monoid[T])(imp
 
   def aggregate(buf: ByteBuffer, position: Int) {
     val a = codec.read(buf, position)
-    val b = codec.fromFloat(selector.get())
+    val selected = selector.get()
+    println("Selected " + selected)
+    val b = codec.fromFloat(selected)
     val value = m(a, b)
+    println("Aggregating %s with %s".format(a.toString, b.toString))
     codec.write(buf, position, value)
   }
 
