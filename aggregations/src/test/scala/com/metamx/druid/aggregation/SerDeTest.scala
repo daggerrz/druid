@@ -7,22 +7,22 @@ import com.metamx.druid.{AllGranularity, DurationGranularity}
 import com.google.common.io.Files
 import com.metamx.druid.query.group.{GroupByQuery, GroupByQueryEngineConfig, GroupByQueryEngine}
 import com.metamx.druid.collect.StupidPool
-import java.nio.ByteBuffer
+import java.nio.{ByteOrder, ByteBuffer}
 import com.google.common.base.Supplier
 import com.metamx.druid.query.segment.QuerySegmentSpecs
 import org.joda.time.Interval
 import com.metamx.druid.aggregation.post.PostAggregator
 import com.metamx.druid.query.dimension.{DimensionSpec, DefaultDimensionSpec}
 import com.metamx.druid.index.QueryableIndex
-import com.metamx.druid.input.{MapBasedRow, MapBasedInputRow, Row}
+import com.metamx.druid.input.{MapBasedRow, Row}
 import org.junit.Assert._
 import com.metamx.common.guava.Accumulator
 import com.metamx.druid.index.v1.serde.ComplexMetrics
+import scala.collection.JavaConverters._
 
 
 class SerDeTest {
 
-  import scala.collection.JavaConverters._
 
   val startTime = 0L
   val dimensions = List("gender", "age").asJava
@@ -32,12 +32,12 @@ class SerDeTest {
   val time = new TimestampSpec("utcdt", "iso")
   val granularity = new DurationGranularity(60 * 1000, startTime)
   val rowParser = new StringInputRowParser(time, data, dimensionExcludes)
-  val aggs = Array[AggregatorFactory](
-    new CountAggregatorFactory("user_count"),
-    new IntAverage(name = "income_average", fieldName = "income")
-  )
 
   def buildIndex(): IncrementalIndex = {
+    val aggs = Array[AggregatorFactory](
+      new CountAggregatorFactory("user_count"),
+      new IntAverage(fieldName = "income", name = "income_average")
+    )
     val index = new IncrementalIndex(
       new IncrementalIndexSchema.Builder()
         .withMinTimestamp(startTime)
@@ -48,9 +48,8 @@ class SerDeTest {
     )
 
     val in = getClass.getResourceAsStream("/users.json")
-    scala.io.Source.fromInputStream(in, "UTF-8").getLines().foreach {
-      line =>
-        index.add(rowParser.parse(line))
+    scala.io.Source.fromInputStream(in, "UTF-8").getLines().foreach { line =>
+      index.add(rowParser.parse(line))
     }
     index
   }
@@ -74,17 +73,22 @@ class SerDeTest {
 
     val queryIndex : QueryableIndex = IndexIO.loadIndex(indexDir)
 
-
     val queryEngine: GroupByQueryEngine = {
       val config = new GroupByQueryEngineConfig {
         def getMaxIntermediateRows: Int = 5
       }
       val supplier = new Supplier[ByteBuffer]() {
-        def get(): ByteBuffer = ByteBuffer.allocate(1024 * 1024)
+        def get(): ByteBuffer = ByteBuffer.allocateDirect(0xFFFF).order(ByteOrder.LITTLE_ENDIAN)
+
       }
       val pool = new StupidPool[ByteBuffer](supplier)
       new GroupByQueryEngine(config, pool)
     }
+
+    val aggs = Array[AggregatorFactory](
+      new CountAggregatorFactory("user_count"),
+      new IntAverage(fieldName = "income_average", name = "income_average")
+    )
 
     val query = new GroupByQuery(
       "example-source",
@@ -116,9 +120,9 @@ class SerDeTest {
     }
     val results = rows.accumulate[ByAge](Map.empty[Int, Average].withDefault(x => Average.identity), accumulator)
 
-    println(results)
-    assertEquals(results(2), 75)
-    assertEquals(results(1), 200)
+    println("RESULTS: " + results)
+    assertEquals(results(100).avg, 75)
+    assertEquals(results(50).avg, 150)
 
   }
 }

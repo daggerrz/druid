@@ -40,7 +40,7 @@ object Average extends Monoid[Average] {
     override def typeName = "average"
   }
 
-  implicit val SerDe = MetricSerde(AverageCodec.typeName, new MetricExtractor[Average], new ObjectCodec[Average](AverageCodec))
+  implicit val SerDe = MetricSerde(AverageCodec.typeName, string => Average(count = 1, sum = string.toInt), new ObjectCodec[Average](AverageCodec))
 
 }
 

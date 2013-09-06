@@ -1,6 +1,6 @@
 package com.metamx.druid.aggregation
 
-import com.metamx.druid.processing.{FloatMetricSelector, ObjectColumnSelector, ColumnSelectorFactory}
+import com.metamx.druid.processing.{ComplexMetricSelector, FloatMetricSelector, ObjectColumnSelector, ColumnSelectorFactory}
 import java.nio.ByteBuffer
 import com.google.common.primitives.Ints
 import java.util.Comparator
@@ -10,7 +10,7 @@ import java.util
 class MonoidAggregatorFactory[T](name: String,
                                 fieldName: String,
                                 cacheTypeId: Byte,
-                                m: Monoid[T])(implicit val ordering: Ordering[T], val codec: BufferCodec[T] with FloatRepresentation[T]) extends AggregatorFactory {
+                                m: Monoid[T])(implicit val ordering: Ordering[T], val codec: BufferCodec[T]) extends AggregatorFactory {
 
 
   final val Comparator = new Comparator[T] {
@@ -19,10 +19,20 @@ class MonoidAggregatorFactory[T](name: String,
 
   def getComparator = Comparator
 
-  def factorize(metricFactory: ColumnSelectorFactory): Aggregator = new MonoidAggeator[T](name, metricFactory.makeFloatMetricSelector(fieldName), m)
+  def factorize(metricFactory: ColumnSelectorFactory): Aggregator = {
+    new MonoidAggeator[T](
+      name,
+      metricFactory.makeComplexMetricSelector(fieldName).asInstanceOf[ComplexMetricSelector[T]],
+      m
+    )
+  }
 
-  def factorizeBuffered(metricFactory: ColumnSelectorFactory): BufferAggregator =
-    new MonoidBufferAggregator(metricFactory.makeFloatMetricSelector(fieldName), m)
+  def factorizeBuffered(metricFactory: ColumnSelectorFactory): BufferAggregator = {
+    new MonoidBufferAggregator(
+      metricFactory.makeComplexMetricSelector(fieldName).asInstanceOf[ComplexMetricSelector[T]],
+      m
+    )
+  }
 
   def combine(lhs: AnyRef, rhs: AnyRef): AnyRef = {
     m(lhs.asInstanceOf[T], rhs.asInstanceOf[T]).asInstanceOf[AnyRef]
@@ -51,29 +61,25 @@ class MonoidAggregatorFactory[T](name: String,
 
 }
 
-class MonoidAggeator[T](final val name: String, selector: FloatMetricSelector, m: Monoid[T])(implicit val codec: BufferCodec[T] with FloatRepresentation[T]) extends Aggregator {
+class MonoidAggeator[T](final val name: String, selector: ComplexMetricSelector[T], m: Monoid[T])(implicit val codec: BufferCodec[T]) extends Aggregator {
   private[this] var value = m.identity
 
-  def aggregate() {
-    value = m.apply(value, codec.fromFloat(selector.get()))
-  }
+  def aggregate() { value = m.apply(value, selector.get()) }
 
-  def reset() {
-    value = m.identity
-  }
+  def reset() { value = m.identity }
 
   def get(): AnyRef = value.asInstanceOf[AnyRef]
-
-  def getFloat: Float = codec.toFloat(value)
 
   def getName: String = name
 
   override def clone = new MonoidAggeator[T](name, selector, m)
 
+  def getFloat: Float = throw new UnsupportedOperationException("This aggregator only supports complex metrics")
+
   def close() {}
 }
 
-class MonoidBufferAggregator[T](selector: FloatMetricSelector, m: Monoid[T])(implicit val codec: BufferCodec[T] with FloatRepresentation[T]) extends BufferAggregator {
+class MonoidBufferAggregator[T](selector: ComplexMetricSelector[T], m: Monoid[T])(implicit val codec: BufferCodec[T]) extends BufferAggregator {
   def init(buf: ByteBuffer, position: Int) {
     codec.write(buf, position, m.identity)
   }
@@ -81,19 +87,13 @@ class MonoidBufferAggregator[T](selector: FloatMetricSelector, m: Monoid[T])(imp
   def aggregate(buf: ByteBuffer, position: Int) {
     val a = codec.read(buf, position)
     val selected = selector.get()
-    println("Selected " + selected)
-    val b = codec.fromFloat(selected)
-    val value = m(a, b)
-    println("Aggregating %s with %s".format(a.toString, b.toString))
+    val value = m(a, selected)
     codec.write(buf, position, value)
   }
 
   def get(buf: ByteBuffer, position: Int): AnyRef = codec.read(buf, position).asInstanceOf[AnyRef]
 
-  def getFloat(buf: ByteBuffer, position: Int): Float = {
-    val value = codec.read(buf, position)
-    codec.toFloat(value)
-  }
+  def getFloat(buf: ByteBuffer, position: Int): Float = throw new UnsupportedOperationException("This aggregator only supports complex metrics")
 
   def close() { }
 }
