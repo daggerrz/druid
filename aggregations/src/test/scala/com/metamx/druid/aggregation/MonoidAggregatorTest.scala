@@ -13,7 +13,7 @@ class MonoidAggregatorTest {
     val selector = new TestSelector(Array(24, 20))
     val agg = new MonoidBufferAggregator[Int](selector, Sum)
 
-    implicit val buffer = ByteBuffer.allocate(agg.codec.byteSize)
+    implicit val buffer = ByteBuffer.allocate(agg.codec.maxIntermediateByteSize)
 
     Assert.assertEquals(0, agg.get(buffer, 0))
     Assert.assertEquals(0, agg.get(buffer, 0))

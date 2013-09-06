@@ -8,7 +8,7 @@ trait BufferCodec[T] {
 
   def write(buf: ByteBuffer, position: Int, value: T)
 
-  def byteSize: Int
+  def maxIntermediateByteSize: Int
 
   def typeName: String = throw new UnsupportedOperationException(this + " does not support getTypeName()")
 }
@@ -36,7 +36,7 @@ object BufferCodec {
 
     def toFloat(value: Int) = value.toFloat
 
-    def byteSize = Ints.BYTES
+    def maxIntermediateByteSize: Int = Ints.BYTES
   }
 
 }

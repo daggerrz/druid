@@ -16,9 +16,6 @@ object Average extends Monoid[Average] {
 
   implicit object AverageCodec extends BufferCodec[Average] with FloatRepresentation[Average] {
     def read(buf: ByteBuffer, position: Int) = {
-
-      println("Read %d, %d".format(buf.getInt(position), buf.getInt(position + 4)))
-
       new Average(
         count = buf.getInt(position),
         sum = buf.getInt(position + 4)
@@ -26,7 +23,6 @@ object Average extends Monoid[Average] {
     }
 
     def write(buf: ByteBuffer, position: Int, value: Average) {
-      println("Write %d, %d".format(value.count, value.sum))
       buf.putInt(position, value.count)
       buf.putInt(position + 4, value.sum)
     }
@@ -35,7 +31,7 @@ object Average extends Monoid[Average] {
 
     def toFloat(value: Average) = value.avg
 
-    def byteSize = 8
+    def maxIntermediateByteSize: Int = 8
 
     override def typeName = "average"
   }

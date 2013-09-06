@@ -20,16 +20,20 @@ class MonoidAggregatorFactory[T](name: String,
   def getComparator = Comparator
 
   def factorize(metricFactory: ColumnSelectorFactory): Aggregator = {
+    val selector = metricFactory.makeComplexMetricSelector(fieldName).asInstanceOf[ComplexMetricSelector[T]]
+    assert(selector != null, "No complex selector available for " + fieldName)
     new MonoidAggeator[T](
       name,
-      metricFactory.makeComplexMetricSelector(fieldName).asInstanceOf[ComplexMetricSelector[T]],
+      selector,
       m
     )
   }
 
   def factorizeBuffered(metricFactory: ColumnSelectorFactory): BufferAggregator = {
+    val selector = metricFactory.makeComplexMetricSelector(fieldName).asInstanceOf[ComplexMetricSelector[T]]
+    assert(selector != null, "No complex selector available for " + fieldName)
     new MonoidBufferAggregator(
-      metricFactory.makeComplexMetricSelector(fieldName).asInstanceOf[ComplexMetricSelector[T]],
+      selector,
       m
     )
   }
@@ -55,7 +59,7 @@ class MonoidAggregatorFactory[T](name: String,
 
   def getTypeName: String = codec.typeName
 
-  def getMaxIntermediateSize = codec.byteSize
+  def getMaxIntermediateSize = codec.maxIntermediateByteSize
 
   def getAggregatorStartValue: AnyRef = m.identity.asInstanceOf[AnyRef]
 

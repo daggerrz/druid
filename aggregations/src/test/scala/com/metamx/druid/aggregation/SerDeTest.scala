@@ -19,6 +19,7 @@ import org.junit.Assert._
 import com.metamx.common.guava.Accumulator
 import com.metamx.druid.index.v1.serde.ComplexMetrics
 import scala.collection.JavaConverters._
+import com.twitter.algebird.HLL
 
 
 class SerDeTest {
@@ -33,10 +34,14 @@ class SerDeTest {
   val granularity = new DurationGranularity(60 * 1000, startTime)
   val rowParser = new StringInputRowParser(time, data, dimensionExcludes)
 
+  ComplexMetrics.registerSerde(Average.AverageCodec.typeName, Average.SerDe)
+  ComplexMetrics.registerSerde(StringCardinality.Codec.typeName, StringCardinality.SerDe)
+
   def buildIndex(): IncrementalIndex = {
     val aggs = Array[AggregatorFactory](
       new CountAggregatorFactory("user_count"),
-      new IntAverage(fieldName = "income", name = "income_average")
+      new IntAverage(fieldName = "income", name = "income_average"),
+      new StringCardinality(fieldName = "name", name = "unique_names")
     )
     val index = new IncrementalIndex(
       new IncrementalIndexSchema.Builder()
@@ -48,30 +53,19 @@ class SerDeTest {
     )
 
     val in = getClass.getResourceAsStream("/users.json")
-    scala.io.Source.fromInputStream(in, "UTF-8").getLines().foreach { line =>
-      index.add(rowParser.parse(line))
+    scala.io.Source.fromInputStream(in, "UTF-8").getLines().foreach {
+      line =>
+        index.add(rowParser.parse(line))
     }
     index
   }
 
-  @Test def testAggregations() {
-    val index = buildIndex()
-    val results = index.iterator().asScala.map { row =>
-        row.getDimension("user_count").get(0).toInt -> row.getDimension("income_average").get(0)
-    }
-    assert(results.contains(2 -> 75))
-    assert(results.contains(1 -> 200))
-  }
-
-  @Test def testBufferAggregations() {
-
-    ComplexMetrics.registerSerde(Average.AverageCodec.typeName, Average.SerDe)
-
+  def doFullRoundTrip(dimensions: Seq[String], aggs: Array[AggregatorFactory]): com.metamx.common.guava.Sequence[Row] = {
     val index = buildIndex()
     val indexDir = Files.createTempDir()
     IndexMerger.persist(index, indexDir)
 
-    val queryIndex : QueryableIndex = IndexIO.loadIndex(indexDir)
+    val queryIndex: QueryableIndex = IndexIO.loadIndex(indexDir)
 
     val queryEngine: GroupByQueryEngine = {
       val config = new GroupByQueryEngineConfig {
@@ -85,17 +79,13 @@ class SerDeTest {
       new GroupByQueryEngine(config, pool)
     }
 
-    val aggs = Array[AggregatorFactory](
-      new CountAggregatorFactory("user_count"),
-      new IntAverage(fieldName = "income_average", name = "income_average")
-    )
 
     val query = new GroupByQuery(
       "example-source",
       QuerySegmentSpecs.create(new Interval(0, System.currentTimeMillis())),
       null,
       new AllGranularity,
-      List[DimensionSpec](new DefaultDimensionSpec("age", "age")).asJava,
+      dimensions.map(n => new DefaultDimensionSpec(n, n)).toList.asInstanceOf[List[DimensionSpec]].asJava,
       aggs.toList.asJava,
       List.empty[PostAggregator].asJava,
       null, // havingSpec,
@@ -103,8 +93,16 @@ class SerDeTest {
       null, // orderbySpec
       null // context
     )
-    val rows : com.metamx.common.guava.Sequence[Row] = queryEngine.process(query, new QueryableIndexStorageAdapter(queryIndex))
+    val rows: com.metamx.common.guava.Sequence[Row] = queryEngine.process(query, new QueryableIndexStorageAdapter(queryIndex))
+    rows
+  }
 
+  @Test def testAverageBufferAggregation() {
+
+    val rows = doFullRoundTrip(Seq("age"), Array[AggregatorFactory](
+      new CountAggregatorFactory("user_count"),
+      new IntAverage(fieldName = "income_average", name = "income_average")
+    ))
 
     type ByAge = Map[Int, Average]
 
@@ -125,4 +123,35 @@ class SerDeTest {
     assertEquals(results(50).avg, 150)
 
   }
+
+  @Test def testCardinalityEstimator() {
+
+    val rows = doFullRoundTrip(Nil, Array[AggregatorFactory](
+      new StringCardinality(fieldName = "unique_names", name = "unique_names")
+    ))
+
+    val accumulator = new Accumulator[HLL, Row] {
+      def accumulate(accumulated: HLL, in: Row): HLL = {
+        val mapRow = in.asInstanceOf[MapBasedRow]
+        val uniques = mapRow.getEvent.get("unique_names").asInstanceOf[HLL]
+        StringCardinality.m.plus(accumulated, uniques)
+      }
+    }
+    val results = rows.accumulate[HLL](StringCardinality.identity, accumulator)
+
+    println("RESULTS: " + results.estimatedSize)
+
+  }
+
+  @Test def testAggregations() {
+    val index = buildIndex()
+    val results = index.iterator().asScala.map { row =>
+      row.getDimension("user_count").get(0).toInt -> row.getDimension("income_average").get(0)
+    }
+    println(results.toList)
+    assert(results.contains(2 -> 75))
+    assert(results.contains(1 -> 200))
+  }
+
+
 }

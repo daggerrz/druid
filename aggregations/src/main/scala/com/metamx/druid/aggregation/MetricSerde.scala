@@ -33,7 +33,7 @@ class ObjectCodec[T](codec: BufferCodec[T])(implicit ordering: Ordering[T], m: M
   def fromByteBuffer(buffer: ByteBuffer, numBytes: Int): T = codec.read(buffer, position = buffer.position())
 
   def toBytes(value: T): Array[Byte] = {
-    val buffer = ByteBuffer.allocate(codec.byteSize)
+    val buffer = ByteBuffer.allocate(codec.maxIntermediateByteSize)   // TODO: No need to use ByteBufs here
     codec.write(buffer, position = 0, value = value)
     buffer.array()
   }
