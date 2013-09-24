@@ -6,8 +6,8 @@ import java.util.Comparator
 import java.util
 
 
-class MonoidAggregatorFactory[T](name: String,
-                                fieldName: String,
+class MonoidAggregatorFactory[T](outputFieldName: String,
+                                inputFieldName: String,
                                 cacheTypeId: Byte,
                                 m: Monoid[T])(implicit val ordering: Ordering[T], val codec: BufferCodec[T]) extends AggregatorFactory {
 
@@ -19,18 +19,18 @@ class MonoidAggregatorFactory[T](name: String,
   def getComparator = Comparator
 
   def factorize(metricFactory: ColumnSelectorFactory): Aggregator = {
-    val selector = metricFactory.makeComplexMetricSelector(fieldName).asInstanceOf[ComplexMetricSelector[T]]
-    assert(selector != null, "No complex selector available for " + fieldName)
+    val selector = metricFactory.makeComplexMetricSelector(inputFieldName).asInstanceOf[ComplexMetricSelector[T]]
+    assert(selector != null, "No complex selector available for " + inputFieldName)
     new MonoidAggeator[T](
-      name,
+      outputFieldName,
       selector,
       m
     )
   }
 
   def factorizeBuffered(metricFactory: ColumnSelectorFactory): BufferAggregator = {
-    val selector = metricFactory.makeComplexMetricSelector(fieldName).asInstanceOf[ComplexMetricSelector[T]]
-    assert(selector != null, "No complex selector available for " + fieldName)
+    val selector = metricFactory.makeComplexMetricSelector(inputFieldName).asInstanceOf[ComplexMetricSelector[T]]
+    assert(selector != null, "No complex selector available for " + inputFieldName)
     new MonoidBufferAggregator(
       selector,
       m
@@ -41,18 +41,18 @@ class MonoidAggregatorFactory[T](name: String,
     m(lhs.asInstanceOf[T], rhs.asInstanceOf[T]).asInstanceOf[AnyRef]
   }
 
-  def getCombiningFactory: AggregatorFactory = new MonoidAggregatorFactory(name, name, cacheTypeId, m)
+  def getCombiningFactory: AggregatorFactory = new MonoidAggregatorFactory(outputFieldName, inputFieldName, cacheTypeId, m)
 
   def deserialize(o: AnyRef): AnyRef = o
 
-  def finalizeComputation(o: AnyRef): AnyRef = o
+  def finalizeComputation(o: AnyRef): AnyRef = codec.asQueryResult(o.asInstanceOf[T])
 
-  def getName: String = name
+  def getName: String = outputFieldName
 
-  def requiredFields: java.util.List[String] = util.Arrays.asList(fieldName)
+  def requiredFields: java.util.List[String] = util.Arrays.asList(inputFieldName)
 
   def getCacheKey: Array[Byte] = {
-    val fieldNameBytes = fieldName.getBytes
+    val fieldNameBytes = inputFieldName.getBytes
     ByteBuffer.allocate(1 + fieldNameBytes.length).put(cacheTypeId).put(fieldNameBytes).array()
   }
 

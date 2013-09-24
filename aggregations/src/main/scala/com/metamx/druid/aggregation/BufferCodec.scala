@@ -4,6 +4,12 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.Ints
 
 trait BufferCodec[T] {
+
+  /**
+   * Convert the current value to a query result value. E.g Avg(10, 10) -> 1
+   */
+  def asQueryResult(value: T) : AnyRef
+
   def read(buf: ByteBuffer, position: Int): T
 
   def write(buf: ByteBuffer, position: Int, value: T)
@@ -26,6 +32,9 @@ trait FloatRepresentation[T] { self : BufferCodec[T] =>
 object BufferCodec {
 
   implicit object IntCodec extends BufferCodec[Int] with FloatRepresentation[Int] {
+
+    def asQueryResult(value: Int): AnyRef = value.asInstanceOf[AnyRef]
+
     def read(buf: ByteBuffer, position: Int) = buf.getInt(position)
 
     def write(buf: ByteBuffer, position: Int, value: Int) {

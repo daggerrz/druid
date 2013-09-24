@@ -1,6 +1,6 @@
 package com.metamx.druid.aggregation
 
-import com.twitter.algebird.{HLL, HyperLogLogMonoid, HyperLogLog}
+import com.twitter.algebird._
 import java.nio.ByteBuffer
 import com.fasterxml.jackson.annotation.JsonProperty
 
@@ -16,6 +16,9 @@ case class CardinalityAggregator[T](typeName: String, fromString: String => T, t
   }
 
   implicit object Codec extends BufferCodec[HLL] {
+
+    def asQueryResult(value: HLL): AnyRef = value.estimatedSize.asInstanceOf[AnyRef]
+
     def write(buf: ByteBuffer, position: Int, value: HLL) {
 
       val oldPos = buf.position()
@@ -41,13 +44,12 @@ case class CardinalityAggregator[T](typeName: String, fromString: String => T, t
       hll
     }
 
-
     final val maxIntermediateByteSize = math.pow(2, m.bits).toInt + 4 + 4
 
     override def typeName = CardinalityAggregator.this.typeName
   }
 
-  implicit val SerDe = MetricSerde(typeName, stringValue => m.apply(toBytes(fromString(stringValue))), new ObjectCodec[HLL](Codec))
+  implicit val SerDe = MetricSerde(typeName, m.zero, stringValue => { if (stringValue == null) m.zero else m.apply(fromString(stringValue))(toBytes) }, new ObjectCodec[HLL](Codec))
 
 }
 

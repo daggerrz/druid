@@ -15,6 +15,9 @@ object Average extends Monoid[Average] {
   }
 
   implicit object AverageCodec extends BufferCodec[Average] with FloatRepresentation[Average] {
+
+    def asQueryResult(value: Average): AnyRef = value.avg.asInstanceOf[AnyRef]
+
     def read(buf: ByteBuffer, position: Int) = {
       new Average(
         count = buf.getInt(position),
@@ -36,7 +39,7 @@ object Average extends Monoid[Average] {
     override def typeName = "average"
   }
 
-  implicit val SerDe = MetricSerde(AverageCodec.typeName, string => Average(count = 1, sum = string.toInt), new ObjectCodec[Average](AverageCodec))
+  implicit val SerDe = MetricSerde(AverageCodec.typeName, identity, string => Average(count = 1, sum = string.toInt), new ObjectCodec[Average](AverageCodec))
 
 }
 
