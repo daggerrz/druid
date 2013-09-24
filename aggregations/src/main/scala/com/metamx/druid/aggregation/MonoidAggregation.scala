@@ -1,8 +1,7 @@
 package com.metamx.druid.aggregation
 
-import com.metamx.druid.processing.{ComplexMetricSelector, FloatMetricSelector, ObjectColumnSelector, ColumnSelectorFactory}
+import com.metamx.druid.processing.{ComplexMetricSelector, ColumnSelectorFactory}
 import java.nio.ByteBuffer
-import com.google.common.primitives.Ints
 import java.util.Comparator
 import java.util
 

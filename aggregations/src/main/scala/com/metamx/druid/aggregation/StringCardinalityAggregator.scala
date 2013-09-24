@@ -4,7 +4,7 @@ import com.twitter.algebird.{HLL, HyperLogLogMonoid, HyperLogLog}
 import java.nio.ByteBuffer
 import com.fasterxml.jackson.annotation.JsonProperty
 
-object StringCardinality extends Monoid[HLL] {
+case class CardinalityAggregator[T](typeName: String, fromString: String => T, toBytes: T => Array[Byte]) extends Monoid[HLL] {
   final val m = new HyperLogLogMonoid(bits = 12)
   def identity: HLL = m.zero
 
@@ -16,7 +16,6 @@ object StringCardinality extends Monoid[HLL] {
   }
 
   implicit object Codec extends BufferCodec[HLL] {
-    // TODO: Too much Bytes -> BB -> Bytes here
     def write(buf: ByteBuffer, position: Int, value: HLL) {
 
       val oldPos = buf.position()
@@ -45,14 +44,20 @@ object StringCardinality extends Monoid[HLL] {
 
     final val maxIntermediateByteSize = math.pow(2, m.bits).toInt + 4 + 4
 
-    override def typeName = "stringCardinality"
+    override def typeName = CardinalityAggregator.this.typeName
   }
 
-  implicit val SerDe = MetricSerde(Codec.typeName, string => m(string)(_.getBytes("UTF-8")), new ObjectCodec[HLL](Codec))
+  implicit val SerDe = MetricSerde(typeName, stringValue => m.apply(toBytes(fromString(stringValue))), new ObjectCodec[HLL](Codec))
 
 }
 
-import StringCardinality._
-class StringCardinality(@JsonProperty("name") name: String,
+object CardinalityAggregator {
+  val String = CardinalityAggregator[String]("stringCardinality", s => s, _.getBytes("UTF-8"))
+}
+
+
+class StringCardinalityAggregator(@JsonProperty("name") name: String,
                  @JsonProperty("fieldName") fieldName: String)
-  extends MonoidAggregatorFactory[HLL](name, fieldName, CacheKeys.StringCardinality, StringCardinality)
+  extends MonoidAggregatorFactory[HLL](name, fieldName, CacheKeys.StringCardinality, CardinalityAggregator.String)(
+    ordering = CardinalityAggregator.String.Ordering, codec = CardinalityAggregator.String.Codec
+  )
