@@ -49,7 +49,8 @@ class MetricExtractor[T <: AnyRef](private final val nullValue: T, private final
     inputRow.getRaw(metricName) match {
       case null => nullValue
       case v : String => extractor(v)
-      case v => v.asInstanceOf[T]
+      case v if m.erasure.isInstance(v) => v.asInstanceOf[T]
+      case v => extractor(String.valueOf(v)) // This is the default behaviour in MapBasedRow.getDimension()
     }
   }
 }
