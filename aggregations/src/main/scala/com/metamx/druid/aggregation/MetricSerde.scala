@@ -46,7 +46,10 @@ class MetricExtractor[T <: AnyRef](private final val nullValue: T, private final
   def extractedClass(): Class[_] = m.erasure.asInstanceOf[Class[T]]
 
   def extractValue(inputRow: com.metamx.druid.input.InputRow, metricName: String): AnyRef = {
-    val values = inputRow.getDimension(metricName)
-    if (values.isEmpty) nullValue else extractor(values.get(0))
+    inputRow.getRaw(metricName) match {
+      case null => nullValue
+      case v : String => extractor(v)
+      case v => v.asInstanceOf[T]
+    }
   }
 }
