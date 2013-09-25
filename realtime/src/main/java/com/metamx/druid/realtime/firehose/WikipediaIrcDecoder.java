@@ -197,6 +197,12 @@ class WikipediaIrcDecoder implements IrcDecoder
       }
 
       @Override
+      public Object getRaw(String dimension)
+      {
+            return dimensions.get(dimension);
+      }
+
+        @Override
       public List<String> getDimension(String dimension)
       {
         final String value = dimensions.get(dimension);
